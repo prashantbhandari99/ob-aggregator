@@ -126,8 +126,6 @@ func (actr *OrderbookWsActor) sendObUpdate(context actor.Context) {
 	if len(actr.ob.Asks) > 0 && len(actr.ob.Bids) > 0 {
 		context.Send(context.Parent(), actr.ob) // sends latest orderbook to parent orderbook manager
 	}
-	context.Send(context.Parent(), actr.ob) // sends latest orderbook to parent orderbook manager
-
 }
 
 func (actr *OrderbookWsActor) writeMessage(message []byte) {
