@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"obAggregator/actors/ob/obUtils"
+	"sync/atomic"
 	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -12,22 +13,21 @@ import (
 
 // This actor processes updates received from a websocket and maintains a local order book.
 // It also sends the latest update to the order book manager.
-// The functionality to stop the actor is not implemented in this version and will be added in the next assignment.
 type OrderbookWsActor struct {
 	conn                            *websocket.Conn
 	exchange, instrument, actorName string
 	ob                              obUtils.Orderbook
-	stopChan                        chan struct{}
+	keepProcessing                  *atomic.Bool
 }
 
 func NewOrderbookWsActor(exchange, instrument string,
-	stopChan chan struct{},
+	keepProcessing *atomic.Bool,
 ) actor.Producer {
 	return func() actor.Actor {
 		return &OrderbookWsActor{
-			exchange:   exchange,
-			instrument: instrument,
-			stopChan:   stopChan,
+			exchange:       exchange,
+			instrument:     instrument,
+			keepProcessing: keepProcessing,
 		}
 	}
 }
@@ -72,7 +72,6 @@ func (actr *OrderbookWsActor) onStop(context actor.Context) {
 
 func (actr *OrderbookWsActor) connectWs(context actor.Context) error {
 	//init actr.ob
-
 	dialer := &websocket.Dialer{}
 	conn, _, err := dialer.Dial("endpoint", nil)
 	if err != nil {
@@ -91,9 +90,10 @@ func (actr *OrderbookWsActor) handleDisconnection(context actor.Context) {
 }
 
 func (actr *OrderbookWsActor) readMessages(context actor.Context) {
-	ticker := time.NewTicker(10 * time.Second) // send a ping every 10 seconds
+	ticker := time.NewTicker(5 * time.Second) // send a ping every 10 seconds
 	defer ticker.Stop()
-	for {
+	actr.keepProcessing.Store(true)
+	for actr.keepProcessing.Load() {
 		select {
 		case <-ticker.C:
 			actr.writeMessage([]byte("ping"))
