@@ -7,8 +7,8 @@ const (
 )
 
 type Orderbook struct {
-	Asks                     OrderBookLevel
-	Bids                     OrderBookLevel
+	Asks                     []OrderBookLevel
+	Bids                     []OrderBookLevel
 	SeqNumber, PrevSeqNumber int64
 	RecvTime                 int64
 }
@@ -17,3 +17,5 @@ type OrderBookLevel struct {
 	Price float64
 	Size  float64
 }
+
+type OrderbookRequest struct{}
