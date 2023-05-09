@@ -74,7 +74,7 @@ func (actr *OrderbookWsActor) connectWs(context actor.Context) error {
 	//init actr.ob
 
 	dialer := &websocket.Dialer{}
-	conn, _, err := dialer.Dial("wss://stream.binance.com:9443/ws/bnbbtc@depth", nil)
+	conn, _, err := dialer.Dial("endpoint", nil)
 	if err != nil {
 		return err
 	}
@@ -106,13 +106,12 @@ func (actr *OrderbookWsActor) readMessages(context actor.Context) {
 			if err != nil {
 				return
 			}
-			log.Println(string("message"))
 		}
 	}
 }
 
 func (actr *OrderbookWsActor) handleL2Update(context actor.Context, update []byte) error {
-	_, err := obUtils.HandleDepthUpdates(update, "BINANCE")
+	_, err := obUtils.HandleDepthUpdates(update, actr.exchange)
 	if err != nil {
 		return err
 	}
