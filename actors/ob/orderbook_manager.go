@@ -3,10 +3,13 @@ package ob
 import (
 	"fmt"
 	"log"
+	"obAggregator/commondefs"
 	"obAggregator/protoMessages/messages"
 	"sync/atomic"
+	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/scheduler"
 )
 
 // This actor is responsible for storing the latest orderbook state
@@ -42,6 +45,10 @@ func (actr *OrderbookManager) init(context actor.Context) error {
 	if err != nil {
 		return err
 	}
+	timer := scheduler.NewTimerScheduler(context)
+	timer.SendRepeatedly(time.Hour*23, time.Hour*23, context.Self(), &commondefs.ActorMessage{
+		Type: commondefs.OB_HEALTH,
+	})
 	return nil
 }
 
@@ -66,6 +73,10 @@ func (actr *OrderbookManager) Receive(context actor.Context) {
 			log.Printf("%s - failed to initialize :- %s", actr.actorName, err)
 			context.Stop(context.Self())
 			return
+		}
+	case *commondefs.ActorMessage:
+		if msg.Type == commondefs.OB_HEALTH {
+			actr.keepProcessing.Store(false)
 		}
 	case *actor.Stopping:
 		actr.onStop(context)
