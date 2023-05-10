@@ -1,0 +1,26 @@
+syntax = "proto3";
+package messages;
+option go_package = "./messages";
+
+
+message OrderbookLevel {  
+  double price = 1;
+  double size = 2;
+}
+
+message OrderbookRequest {
+  string  sender = 1;
+  string exchange = 2;
+  string instrument = 3;
+  int32 levels = 4;
+}
+
+message OrderbookResponse {
+  string sender = 1;
+  string exchange = 2;
+  string instrument = 3;
+  repeated OrderbookLevel asks = 4;
+  repeated OrderbookLevel bids = 5;
+  int64 LastUpdateTime = 6;
+  int64 ReceivedTime = 7;
+}

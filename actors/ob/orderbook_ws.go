@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"obAggregator/actors/ob/obUtils"
+	"obAggregator/protoMessages/messages"
 	"sync/atomic"
 	"time"
 
@@ -16,8 +17,8 @@ import (
 type OrderbookWsActor struct {
 	conn                            *websocket.Conn
 	exchange, instrument, actorName string
-	ob                              obUtils.Orderbook
-	keepProcessing                  *atomic.Bool
+	// ob                              obUtils.Orderbook
+	keepProcessing *atomic.Bool
 }
 
 func NewOrderbookWsActor(exchange, instrument string,
@@ -42,7 +43,6 @@ func (actr *OrderbookWsActor) init(context actor.Context) error {
 func (actr *OrderbookWsActor) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case *actor.Started:
-		log.Printf("%s:Started, initializing...", actr.actorName)
 		if err := actr.init(context); err != nil {
 			log.Printf("%s - failed to initialize :- %s", actr.actorName, err)
 			context.Stop(context.Self())
@@ -72,12 +72,12 @@ func (actr *OrderbookWsActor) onStop(context actor.Context) {
 
 func (actr *OrderbookWsActor) connectWs(context actor.Context) error {
 	//init actr.ob
-	dialer := &websocket.Dialer{}
-	conn, _, err := dialer.Dial("endpoint", nil)
-	if err != nil {
-		return err
-	}
-	actr.conn = conn
+	// dialer := &websocket.Dialer{}
+	// conn, _, err := dialer.Dial("endpoint", nil)
+	// if err != nil {
+	// 	return err
+	// }
+	// actr.conn = conn
 	actr.readMessages(context)
 	return nil
 }
@@ -94,37 +94,41 @@ func (actr *OrderbookWsActor) readMessages(context actor.Context) {
 	defer ticker.Stop()
 	actr.keepProcessing.Store(true)
 	for actr.keepProcessing.Load() {
+
 		select {
 		case <-ticker.C:
-			actr.writeMessage([]byte("ping"))
+			err := actr.handleL2Update(context)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		default:
-			_, message, err := actr.conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			err = actr.handleL2Update(context, message)
-			if err != nil {
-				return
-			}
+			// 	actr.writeMessage([]byte("ping"))
+			// default:
+			// 	_, message, err := actr.conn.ReadMessage()
+			// 	if err != nil {
+			// 		return
 		}
+
+		// }
 	}
 }
 
-func (actr *OrderbookWsActor) handleL2Update(context actor.Context, update []byte) error {
-	_, err := obUtils.HandleDepthUpdates(update, actr.exchange)
+func (actr *OrderbookWsActor) handleL2Update(context actor.Context) error {
+	ob, err := obUtils.HandleDepthUpdates(actr.exchange, actr.instrument)
 	if err != nil {
 		return err
 	}
 	// apply l2Updates to the local orderbook (actr.ob). If any event drop is
 	// detected, the program will disconnect and reconnect the websocket using actr.handleDisconnecion. This
 	// will also reset the state of the local orderbook (actr.ob).
-	actr.sendObUpdate(context)
+	actr.sendObUpdate(context, ob)
 	return nil
 }
 
-func (actr *OrderbookWsActor) sendObUpdate(context actor.Context) {
-	if len(actr.ob.Asks) > 0 && len(actr.ob.Bids) > 0 {
-		context.Send(context.Parent(), actr.ob) // sends latest orderbook to parent orderbook manager
+func (actr *OrderbookWsActor) sendObUpdate(context actor.Context, ob *messages.OrderbookResponse) {
+	if len(ob.Asks) > 0 && len(ob.Bids) > 0 {
+		context.Send(context.Parent(), ob) // sends latest orderbook to parent orderbook manager
 	}
 }
 

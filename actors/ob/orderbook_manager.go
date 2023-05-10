@@ -3,7 +3,7 @@ package ob
 import (
 	"fmt"
 	"log"
-	"obAggregator/actors/ob/obUtils"
+	"obAggregator/protoMessages/messages"
 	"sync/atomic"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -15,20 +15,20 @@ type OrderbookManager struct {
 	actorName      string
 	instrument     string
 	exchange       string
-	ob             obUtils.Orderbook
 	supervisor     actor.SupervisorStrategy
 	childWsPid     *actor.PID
 	keepProcessing *atomic.Bool
 }
 
 func NewOrderbookManager(
-	instrument,
-	exchange string,
+	exchange,
+	instrument string,
 	supervisor actor.SupervisorStrategy,
 ) actor.Producer {
 	return func() actor.Actor {
 		return &OrderbookManager{
 			exchange:   exchange,
+			instrument: instrument,
 			supervisor: supervisor,
 		}
 	}
@@ -62,7 +62,6 @@ func (actr *OrderbookManager) startWsActor(context actor.Context) error {
 func (actr *OrderbookManager) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case *actor.Started:
-		log.Printf("%s:Started, initializing...", actr.actorName)
 		if err := actr.init(context); err != nil {
 			log.Printf("%s - failed to initialize :- %s", actr.actorName, err)
 			context.Stop(context.Self())
@@ -79,10 +78,8 @@ func (actr *OrderbookManager) Receive(context actor.Context) {
 		log.Printf("%s - DeadLetterEvent, %s", actr.actorName, fmt.Sprintf("UndeliveredMessage - %v", msg))
 	case *actor.DeadLetterResponse:
 		log.Printf("%s - DeadLetterResponse %s ", actr.actorName, fmt.Sprintf("UndeliveredMessage - %T", msg))
-	case obUtils.Orderbook:
+	case *messages.OrderbookResponse:
 		actr.handleObUpdate(msg, context)
-	case *obUtils.OrderbookRequest:
-		actr.onObRequest(context)
 	case *actor.Terminated:
 		log.Printf("Terminated %v...", msg)
 	default:
@@ -90,13 +87,9 @@ func (actr *OrderbookManager) Receive(context actor.Context) {
 	}
 }
 
-func (actr *OrderbookManager) handleObUpdate(msg obUtils.Orderbook,
+func (actr *OrderbookManager) handleObUpdate(msg *messages.OrderbookResponse,
 	context actor.Context) {
-	actr.ob = msg
-}
-
-func (actr *OrderbookManager) onObRequest(context actor.Context) {
-	context.Respond(actr.ob)
+	context.ActorSystem().EventStream.Publish(msg)
 }
 
 func (actr *OrderbookManager) onStop(context actor.Context) {
