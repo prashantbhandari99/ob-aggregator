@@ -90,7 +90,7 @@ func (actr *OrderbookWsActor) handleDisconnection(context actor.Context) {
 }
 
 func (actr *OrderbookWsActor) readMessages(context actor.Context) {
-	ticker := time.NewTicker(5 * time.Second) // send a ping every 10 seconds
+	ticker := time.NewTicker(400 * time.Millisecond) // send a ping every 10 seconds
 	defer ticker.Stop()
 	actr.keepProcessing.Store(true)
 	for actr.keepProcessing.Load() {

@@ -34,7 +34,7 @@ func startSupervisors(gracefulStop chan os.Signal) {
 	if serviceToStart == "--delta" {
 		port = 9081
 	}
-	r := remote.NewRemote(system, remote.Configure("0.0.0.0", port, //make port configurable
+	r := remote.NewRemote(system, remote.Configure("0.0.0.0", port,
 		remote.WithAdvertisedHost(fmt.Sprintf("0.0.0.0:%v", port))))
 	r.Start()
 	decider := func(reason interface{}) actor.Directive {
